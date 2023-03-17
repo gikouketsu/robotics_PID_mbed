@@ -1,0 +1,69 @@
+#include "mbed.h"
+#include "QEI.h"
+
+//定义编码器的引脚
+QEI encoder(PA_8, PB_10,  NC, 400);
+
+//定义TB67H450驱动器控制引脚
+DigitalOut dir(PB_1);
+PwmOut pwm(PB_2);
+
+//定义PID参数
+double Kp = 0.05;
+double Ki = 0.1;
+double Kd = 0.05;
+
+//定义PID计算使用的变量
+double last_error = 0.0;
+double integral = 0.0;
+
+//定义目标位置
+double target_position = 1000.0;
+
+//定义PID计算函数
+double pid(double input) {
+
+    double error = target_position - input; // 算出距离目标值之间的距离
+    double derivative = error - last_error; // 每一瞬间的移动之后，距离目标值之间的距离
+    integral += error;
+    last_error = error;
+    return Kp*error + Ki*integral + Kd*derivative;
+}
+
+
+
+
+int main() {
+    //设置PWM周期
+    pwm.period_ms(20);
+
+    for(;;) {
+        //读取编码器位置
+        double position = encoder.getPulses();
+        // 显示
+        printf("%d\n", encoder.getPulses());
+        //计算PID控制输出
+        double output = pid(position);
+        //将PID控制输出限制在0到1之间
+        if(output < 0.0) {
+            output = 0.0;
+        }
+        else if(output > 1.0) {
+            output = 1;
+        }
+        //将PID控制输出作为PWM信号输出到驱动器
+        pwm.write(output);
+        //根据PID控制输出方向设置驱动器控制引脚
+        if(output > 0.0) {
+            dir = 1;
+        }
+        else {
+            dir = 0;
+        }
+        //等待一段时间
+        ThisThread::sleep_for(1ms);
+    }
+}
+
+
+
